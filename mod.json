@@ -1,0 +1,16 @@
+{
+	"geode": "4.6.0",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
+	},
+	"version": "v1.0.0",
+	"id": "yourname.menu-background",
+	"name": "Menu Background Picker",
+	"developer": "YourName",
+	"description": "Pick your own images for the main menu background and switch between them.",
+	"repository": "https://github.com/yourname/menu-background",
+	"tags": ["customization", "interface"]
+}
