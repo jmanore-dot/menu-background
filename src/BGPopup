@@ -1,0 +1,131 @@
+#include "BGPopup.hpp"
+#include "BackgroundManager.hpp"
+
+using namespace geode::prelude;
+
+BGPopup* BGPopup::create() {
+    auto ret = new BGPopup();
+    if (ret->initAnchored(320.f, 200.f)) {
+        ret->autorelease();
+        return ret;
+    }
+    delete ret;
+    return nullptr;
+}
+
+bool BGPopup::setup() {
+    this->setTitle("Menu Background");
+
+    auto size = m_mainLayer->getContentSize();
+
+    m_status = CCLabelBMFont::create("", "bigFont.fnt");
+    m_status->setScale(0.5f);
+    m_status->setPosition({size.width / 2, size.height / 2 + 35.f});
+    m_mainLayer->addChild(m_status);
+
+    auto menu = CCMenu::create();
+    menu->setPosition({size.width / 2, size.height / 2});
+    m_mainLayer->addChild(menu);
+
+    // previous / next arrows
+    auto leftSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_01_001.png");
+    auto prevBtn = CCMenuItemSpriteExtra::create(leftSpr, this, menu_selector(BGPopup::onPrev));
+    prevBtn->setPosition({-110.f, 35.f});
+    menu->addChild(prevBtn);
+
+    auto rightSpr = CCSprite::createWithSpriteFrameName("GJ_arrow_01_001.png");
+    rightSpr->setFlipX(true);
+    auto nextBtn = CCMenuItemSpriteExtra::create(rightSpr, this, menu_selector(BGPopup::onNext));
+    nextBtn->setPosition({110.f, 35.f});
+    menu->addChild(nextBtn);
+
+    // pick image
+    auto addBtn = CCMenuItemSpriteExtra::create(
+        ButtonSprite::create("Add Image"), this, menu_selector(BGPopup::onAdd)
+    );
+    addBtn->setPosition({0.f, -10.f});
+    menu->addChild(addBtn);
+
+    // remove current / reset to default
+    auto removeBtn = CCMenuItemSpriteExtra::create(
+        ButtonSprite::create("Remove", 90, true, "goldFont.fnt", "GJ_button_06.png", 30.f, 0.7f),
+        this, menu_selector(BGPopup::onRemove)
+    );
+    removeBtn->setPosition({-60.f, -55.f});
+    menu->addChild(removeBtn);
+
+    auto defBtn = CCMenuItemSpriteExtra::create(
+        ButtonSprite::create("Default", 90, true, "goldFont.fnt", "GJ_button_06.png", 30.f, 0.7f),
+        this, menu_selector(BGPopup::onDefault)
+    );
+    defBtn->setPosition({60.f, -55.f});
+    menu->addChild(defBtn);
+
+    this->updateStatus();
+    return true;
+}
+
+void BGPopup::updateStatus() {
+    int n = static_cast<int>(bgm::getImages().size());
+    int idx = bgm::getIndex();
+    if (idx < 0 || idx >= n) {
+        m_status->setString(fmt::format("Default background ({} saved)", n).c_str());
+    }
+    else {
+        m_status->setString(fmt::format("Image {} / {}", idx + 1, n).c_str());
+    }
+}
+
+void BGPopup::onAdd(CCObject*) {
+    file::FilePickOptions options;
+    options.filters.push_back({"Images", {"*.png", "*.jpg", "*.jpeg"}});
+
+    m_pickListener.bind([this](Task<Result<std::filesystem::path>>::Event* event) {
+        if (auto value = event->getValue()) {
+            if (value->isOk()) {
+                auto res = bgm::addImage(value->unwrap());
+                if (res.isErr()) {
+                    FLAlertLayer::create("Error", res.unwrapErr().c_str(), "OK")->show();
+                }
+                else {
+                    Notification::create("Background added!", NotificationIcon::Success)->show();
+                    bgm::applyToScene();
+                    this->updateStatus();
+                }
+            }
+            else {
+                FLAlertLayer::create("Error", value->unwrapErr().c_str(), "OK")->show();
+            }
+        }
+    });
+    m_pickListener.setFilter(file::pick(file::PickMode::OpenFile, options));
+}
+
+void BGPopup::onNext(CCObject*) {
+    bgm::next();
+    bgm::applyToScene();
+    this->updateStatus();
+}
+
+void BGPopup::onPrev(CCObject*) {
+    bgm::prev();
+    bgm::applyToScene();
+    this->updateStatus();
+}
+
+void BGPopup::onRemove(CCObject*) {
+    if (bgm::removeCurrent()) {
+        Notification::create("Image removed", NotificationIcon::Success)->show();
+    }
+    else {
+        Notification::create("No custom image selected", NotificationIcon::Warning)->show();
+    }
+    bgm::applyToScene();
+    this->updateStatus();
+}
+
+void BGPopup::onDefault(CCObject*) {
+    bgm::setIndex(-1);
+    bgm::applyToScene();
+    this->updateStatus();
+}
